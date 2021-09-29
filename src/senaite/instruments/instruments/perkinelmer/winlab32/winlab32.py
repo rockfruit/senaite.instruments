@@ -66,29 +66,36 @@ class Winlab32(InstrumentResultsFileParser):
 
     def parse(self):
         order = []
-        ext = splitext(self.infile.filename.lower())[-1]
+        filename = str(self.infile.filename)
+        ext = splitext(filename.lower())[-1]
+        self.csv_data = None
         if ext == '.xlsx':
             order = (xlsx_to_csv, xls_to_csv)
         elif ext == '.xls':
             order = (xls_to_csv, xlsx_to_csv)
         elif ext == '.csv':
             self.csv_data = self.infile
-        if order:
-            for importer in order:
-                try:
-                    self.csv_data = importer(
-                        infile=self.infile,
-                        worksheet=self.worksheet,
-                        delimiter=self.delimiter)
-                    break
-                except SheetNotFound:
-                    self.err("Sheet not found in workbook: %s" % self.worksheet)
-                    return -1
-                except Exception as e:  # noqa
-                    pass
-            else:
-                self.warn("Can't parse input file as XLS, XLSX, or CSV.")
+        else:
+            self.err("%s is not an XLS, XLSX, or CSV document" % filename)
+            return -1
+
+        for importer in order:
+            try:
+                self.csv_data = importer(
+                    infile=self.infile,
+                    worksheet=self.worksheet,
+                    delimiter=",")
+                break
+            except SheetNotFound:
+                self.err("Sheet not found in workbook: %s" % self.worksheet)
                 return -1
+            except Exception as e:  # noqa
+                pass
+
+        if not self.csv_data:
+            self.warn("Can't parse input file as XLS, XLSX, or CSV.")
+            return -1
+
         stub = FileStub(file=self.csv_data, name=str(self.infile.filename))
         self.csv_data = FileUpload(stub)
 
@@ -97,6 +104,9 @@ class Winlab32(InstrumentResultsFileParser):
         for row in reader:
             self.parse_row(reader.line_num, row)
         return 0
+
+    def getAnalysisKeywords(self):
+        return InstrumentResultsFileParser.getAnalysisKeywords(self)
 
     def parse_row(self, row_nr, row):
         # convert row to use interim field names
@@ -107,19 +117,27 @@ class Winlab32(InstrumentResultsFileParser):
         parsed = {'reading': value, 'DefaultResult': 'reading'}
 
         sample_id = subn(r'[^\w\d\-_]*', '', row.get('Sample ID', ""))[0]
-        kw = subn(r"[^\w\d]*", "", row.get('Analyte Name', ""))[0]
-        kw = kw.lower()
-        if not sample_id or not kw:
+        if not sample_id:
+            return 0
+        ar = self.get_ar(sample_id)
+        if not ar:
+            msg = 'Sample not found for {}'.format(sample_id)
+            self.warn(msg, numline=row_nr, line=str(row))
             return 0
 
-        try:
-            ar = self.get_ar(sample_id)
-            self.get_analysis(ar, kw)
-        except Exception as e:
-            self.warn(msg="Error getting analysis for '${s}/${kw}': ${e}",
-                      mapping={'s': sample_id, 'kw': kw, 'e': repr(e)},
-                      numline=row_nr, line=str(row))
-            return
+        kw = subn(r"[^\w\d]*", "", row.get('Analyte Name', ""))[0]
+        if not kw:
+            return 0
+        all_analyses = ar.getAnalyses()
+        kw_analyses = [a for a in all_analyses if a.getKeyword.startswith(kw)]
+        if not kw_analyses:
+            self.warn("No analysis found matching Keyword '${kw}'",
+                      mapping=dict(kw=kw))
+            return 0
+        if len(kw_analyses) > 1:
+            self.warn('Multiple analyses found matching Keyword "${kw}"',
+                      mapping=dict(kw=kw))
+            return 0
 
         self._addRawResult(sample_id, {kw: parsed})
         return 0
@@ -133,23 +151,6 @@ class Winlab32(InstrumentResultsFileParser):
         except IndexError:
             pass
 
-    @staticmethod
-    def get_analyses(ar):
-        brains = ar.getAnalyses()
-        return dict((a.getKeyword, a) for a in brains)
-
-    def get_analysis(self, ar, kw):
-        kw = kw.lower()
-        brains = self.get_analyses(ar)
-        brains = [v for k, v in brains.items() if k.startswith(kw)]
-        if len(brains) < 1:
-            msg = "No analysis found matching Keyword '${kw}'",
-            raise AnalysisNotFound(msg, kw=kw)
-        if len(brains) > 1:
-            msg = "Multiple brains found matching Keyword '${kw}'",
-            raise MultipleAnalysesFound(msg, kw=kw)
-        return brains[0]
-
 
 class importer(object):
     implements(IInstrumentImportInterface, IInstrumentAutoImportInterface)
@@ -162,52 +163,51 @@ class importer(object):
 
     @staticmethod
     def Import(context, request):
-        errors = []
-        logs = []
-        warns = []
 
         infile = request.form['instrument_results_file']
         if not hasattr(infile, 'filename'):
-            errors.append(_("No file selected"))
+            results = {'errors': [_('No file selected')],
+                       'log': [],
+                       'warns': []}
+            return json.dumps(results)
 
         artoapply = request.form['artoapply']
         override = request.form['results_override']
-        worksheet = request.form.get('worksheet', 0)
         instrument = request.form.get('instrument', None)
+        worksheet = request.form.get('worksheet', 0)
 
         parser = Winlab32(infile, worksheet=worksheet)
-        if parser:
 
+        status = ['sample_received', 'attachment_due', 'to_be_verified']
+        if artoapply == 'received':
+            status = ['sample_received']
+        elif artoapply == 'received_tobeverified':
             status = ['sample_received', 'attachment_due', 'to_be_verified']
-            if artoapply == 'received':
-                status = ['sample_received']
-            elif artoapply == 'received_tobeverified':
-                status = ['sample_received', 'attachment_due', 'to_be_verified']
 
+        over = [False, False]
+        if override == 'nooverride':
             over = [False, False]
-            if override == 'nooverride':
-                over = [False, False]
-            elif override == 'override':
-                over = [True, False]
-            elif override == 'overrideempty':
-                over = [True, True]
+        elif override == 'override':
+            over = [True, False]
+        elif override == 'overrideempty':
+            over = [True, True]
 
-            importer = AnalysisResultsImporter(
-                parser=parser,
-                context=context,
-                allowed_ar_states=status,
-                allowed_analysis_states=None,
-                override=over,
-                instrument_uid=instrument)
+        importer = AnalysisResultsImporter(
+            parser=parser,
+            context=context,
+            allowed_ar_states=status,
+            allowed_analysis_states=None,
+            override=over,
+            instrument_uid=instrument)
 
-            try:
-                importer.process()
-                errors = importer.errors
-                logs = importer.logs
-                warns = importer.warns
-            except Exception as e:
-                errors.extend([repr(e), traceback.format_exc()])
+        try:
+            importer.process()
+        except Exception as e:
+            results = {'errors': [repr(e), traceback.format_exc()],
+                       'log': [], 'warns': []}
+            return json.dumps(results)
 
-        results = {'errors': errors, 'log': logs, 'warns': warns}
-
+        results = {'errors': importer.errors,
+                   'log': importer.logs,
+                   'warns': importer.warns}
         return json.dumps(results)

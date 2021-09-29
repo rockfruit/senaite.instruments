@@ -45,6 +45,7 @@ here = abspath(dirname(__file__))
 path = join(here, 'files', 'instruments', 'bruker', 's8tiger')
 fn1 = join(path, 'DU-0001-234987347.xlsx')
 fn2 = join(path, 'DU-0001.csv')
+fn3 = join(path, 'DU-0001.invalid')
 
 service_interims = [
     dict(keyword='formula', title='Formula', hidden=True),
@@ -94,13 +95,13 @@ class TestBrukerS8Tiger(BaseTestCase):
 
         self.services = [
             self.add_analysisservice(title='Ag 107',
-                                     Keyword='ag107',
+                                     Keyword='Ag107',
                                      PointOfCapture='lab',
                                      Category='Metals',
                                      Calculation='Dilution',
                                      InterimFields=service_interims),
             self.add_analysisservice(title='al 27',
-                                     Keyword='al27',
+                                     Keyword='Al27',
                                      PointOfCapture='lab',
                                      Category='Metals',
                                      Calculation='Dilution',
@@ -122,16 +123,65 @@ class TestBrukerS8Tiger(BaseTestCase):
         data = open(fn1, 'rb').read()
         import_file = FileUpload(TestFile(cStringIO.StringIO(data), fn1))
         request = TestRequest(form=dict(
-            instrument_results_file_format='xlsx',
             submitted=True,
             artoapply='received_tobeverified',
             results_override='override',
             instrument_results_file=import_file,
+            worksheet='Concentrations',
             default_unit='pct',
             instrument=''))
         results = importer.Import(self.portal, request)
-        ag = ar.getAnalyses(full_objects=True, getKeyword='ag107')[0]
-        al = ar.getAnalyses(full_objects=True, getKeyword='al27')[0]
+        ag = ar.getAnalyses(full_objects=True, getKeyword='Ag107')[0]
+        al = ar.getAnalyses(full_objects=True, getKeyword='Al27')[0]
+        test_results = eval(results)  # noqa
+        self.assertEqual(ag.getResult(), '111.8')
+        self.assertEqual(al.getResult(), '222.8')
+
+    def test_import_xlsx_wrong_sheetname(self):
+        ar = self.add_analysisrequest(
+            self.client,
+            dict(Client=self.client.UID(),
+                 Contact=self.contact.UID(),
+                 DateSampled=datetime.now().date().isoformat(),
+                 SampleType=self.sampletype.UID()),
+            [srv.UID() for srv in self.services])
+        api.do_transition_for(ar, 'receive')
+        data = open(fn1, 'rb').read()
+        import_file = FileUpload(TestFile(cStringIO.StringIO(data), fn1))
+        request = TestRequest(form=dict(
+            submitted=True,
+            artoapply='received_tobeverified',
+            results_override='override',
+            instrument_results_file=import_file,
+            worksheet='WrongSheetName',
+            default_unit='pct',
+            instrument=''))
+        results = importer.Import(self.portal, request)
+        results = eval(results)  # noqa
+        self.assertTrue('Sheet not found' in str(results['errors'][0]))
+
+    def test_import_xlsx_with_sheet_nr(self):
+        ar = self.add_analysisrequest(
+            self.client,
+            dict(Client=self.client.UID(),
+                 Contact=self.contact.UID(),
+                 DateSampled=datetime.now().date().isoformat(),
+                 SampleType=self.sampletype.UID()),
+            [srv.UID() for srv in self.services])
+        api.do_transition_for(ar, 'receive')
+        data = open(fn1, 'rb').read()
+        import_file = FileUpload(TestFile(cStringIO.StringIO(data), fn1))
+        request = TestRequest(form=dict(
+            submitted=True,
+            artoapply='received_tobeverified',
+            results_override='override',
+            instrument_results_file=import_file,
+            worksheet=0,
+            default_unit='pct',
+            instrument=''))
+        results = importer.Import(self.portal, request)
+        ag = ar.getAnalyses(full_objects=True, getKeyword='Ag107')[0]
+        al = ar.getAnalyses(full_objects=True, getKeyword='Al27')[0]
         test_results = eval(results)  # noqa
         self.assertEqual(ag.getResult(), '111.8')
         self.assertEqual(al.getResult(), '222.8')
@@ -148,19 +198,43 @@ class TestBrukerS8Tiger(BaseTestCase):
         data = open(fn2, 'rb').read()
         import_file = FileUpload(TestFile(cStringIO.StringIO(data), fn2))
         request = TestRequest(form=dict(
-            instrument_results_file_format='xlsx',
             submitted=True,
             artoapply='received_tobeverified',
             results_override='override',
             instrument_results_file=import_file,
             default_unit='pct',
             instrument=''))
+
         results = importer.Import(self.portal, request)
-        ag = ar.getAnalyses(full_objects=True, getKeyword='ag107')[0]
-        al = ar.getAnalyses(full_objects=True, getKeyword='al27')[0]
+        ag = ar.getAnalyses(full_objects=True, getKeyword='Ag107')[0]
+        al = ar.getAnalyses(full_objects=True, getKeyword='Al27')[0]
         test_results = eval(results)  # noqa
         self.assertEqual(ag.getResult(), '111.8')
         self.assertEqual(al.getResult(), '222.8')
+
+    def test_import_invalid_filename(self):
+        ar = self.add_analysisrequest(
+            self.client,
+            dict(Client=self.client.UID(),
+                 Contact=self.contact.UID(),
+                 DateSampled=datetime.now().date().isoformat(),
+                 SampleType=self.sampletype.UID()),
+            [srv.UID() for srv in self.services])
+        api.do_transition_for(ar, 'receive')
+        data = open(fn3, 'rb').read()
+
+        import_file = FileUpload(TestFile(cStringIO.StringIO(data), fn3))
+        request = TestRequest(form=dict(
+            submitted=True,
+            artoapply='received_tobeverified',
+            results_override='override',
+            instrument_results_file=import_file,
+            default_unit='pct',
+            instrument=''))
+
+        results = importer.Import(self.portal, request)
+        results = eval(results)  # noqa
+        self.assertTrue('XLS, XLSX, or CSV' in str(results['errors'][0]))
 
     def test_import_ppm(self):
         ar = self.add_analysisrequest(
@@ -174,7 +248,6 @@ class TestBrukerS8Tiger(BaseTestCase):
         data = open(fn2, 'rb').read()
         import_file = FileUpload(TestFile(cStringIO.StringIO(data), fn2))
         request = TestRequest(form=dict(
-            instrument_results_file_format='xlsx',
             submitted=True,
             artoapply='received_tobeverified',
             results_override='override',
@@ -182,11 +255,51 @@ class TestBrukerS8Tiger(BaseTestCase):
             default_unit='ppm',
             instrument=''))
         results = importer.Import(self.portal, request)
-        ag = ar.getAnalyses(full_objects=True, getKeyword='ag107')[0]
-        al = ar.getAnalyses(full_objects=True, getKeyword='al27')[0]
+        ag = ar.getAnalyses(full_objects=True, getKeyword='Ag107')[0]
+        al = ar.getAnalyses(full_objects=True, getKeyword='Al27')[0]
         test_results = eval(results)  # noqa
         self.assertEqual(ag.getResult(), '1118000.0')
         self.assertEqual(al.getResult(), '2228000.0')
+
+    def test_multiple_analyses_found_with_keyword(self):
+        services = [
+            self.add_analysisservice(
+                title='asdf 1',
+                Keyword='asdf1',
+                PointOfCapture='lab',
+                Category=self.add_analysiscategory(title='Metals'),
+                Calculation='Dilution' ,
+                InterimFields=service_interims),
+            self.add_analysisservice(
+                title='asdf 2',
+                Keyword='asdf2',
+                PointOfCapture='lab',
+                Category=self.add_analysiscategory(title='Metals'),
+                Calculation='Dilution',
+                InterimFields=service_interims)
+        ]
+
+        ar = self.add_analysisrequest(
+            self.client,
+            dict(Client=self.client.UID(),
+                 Contact=self.contact.UID(),
+                 DateSampled=datetime.now().date().isoformat(),
+                 SampleType=self.sampletype.UID()),
+            [srv.UID() for srv in services])
+        api.do_transition_for(ar, 'receive')
+        fn = join(path, 'multiple_analyses_error/DU-0001.csv')
+        data = open(fn, 'r').read()
+        import_file = FileUpload(TestFile(cStringIO.StringIO(data), fn))
+        request = TestRequest(form=dict(
+            submitted=True,
+            artoapply='received_tobeverified',
+            results_override='override',
+            instrument_results_file=import_file,
+            default_unit='ppm',
+            instrument=''))
+        results = importer.Import(self.portal, request)
+        results = eval(results)  # noqa
+        self.assertTrue('Multiple analyses found' in results['warns'][0])
 
 
 def test_suite():

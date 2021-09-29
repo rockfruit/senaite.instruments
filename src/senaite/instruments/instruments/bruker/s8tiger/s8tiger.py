@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 #
 # This file is part of SENAITE.INSTRUMENTS.
@@ -45,7 +46,7 @@ from zope.publisher.browser import FileUpload
 
 field_interim_map = {
     "Formula": "formula",
-    "Concentration": "concentration",
+    "Concentration": "reading",
     "Z": "z",
     "Status": "status",
     "Line 1": "line_1",
@@ -57,30 +58,15 @@ field_interim_map = {
 }
 
 
-class SampleNotFound(Exception):
-    pass
-
-
-class MultipleAnalysesFound(Exception):
-    pass
-
-
-class AnalysisNotFound(Exception):
-    pass
-
-
 class S8TigerParser(InstrumentResultsFileParser):
     ar = None
 
-    def __init__(self, infile, worksheet=None, encoding=None,
-                 default_unit=None, delimiter=None):
-        self.delimiter = delimiter if delimiter else ','
-        self.unit = default_unit if default_unit else "pct"
-        self.encoding = encoding
+    def __init__(self, infile, worksheet=0, default_unit=None):
+        self.infile = infile
+        self.worksheet = worksheet if worksheet else 0
+        self.default_unit = default_unit if default_unit else "pct"
         self.ar = None
         self.analyses = None
-        self.worksheet = worksheet if worksheet else 0
-        self.infile = infile
         self.csv_data = None
         self.sample_id = None
         mimetype = guess_type(self.infile.filename)
@@ -88,29 +74,36 @@ class S8TigerParser(InstrumentResultsFileParser):
 
     def parse(self):
         order = []
-        ext = splitext(self.infile.filename.lower())[-1]
+        filename = str(self.infile.filename)
+        ext = splitext(filename.lower())[-1]
+        self.csv_data = None
         if ext == '.xlsx':
             order = (xlsx_to_csv, xls_to_csv)
         elif ext == '.xls':
             order = (xls_to_csv, xlsx_to_csv)
         elif ext == '.csv':
             self.csv_data = self.infile
-        if order:
-            for importer in order:
-                try:
-                    self.csv_data = importer(
-                        infile=self.infile,
-                        worksheet=self.worksheet,
-                        delimiter=self.delimiter)
-                    break
-                except SheetNotFound:
-                    self.err("Sheet not found in workbook: %s" % self.worksheet)
-                    return -1
-                except Exception as e:  # noqa
-                    pass
-            else:
-                self.warn("Can't parse input file as XLS, XLSX, or CSV.")
+        else:
+            self.err("%s is not an XLS, XLSX, or CSV document" % filename)
+            return -1
+
+        for importer in order:
+            try:
+                self.csv_data = importer(
+                    infile=self.infile,
+                    worksheet=self.worksheet,
+                    delimiter=",")
+                break
+            except SheetNotFound:
+                self.err("Sheet not found in workbook: %s" % self.worksheet)
                 return -1
+            except Exception as e:  # noqa
+                pass
+
+        if not self.csv_data:
+            self.warn("Can't parse input file as XLS, XLSX, or CSV.")
+            return -1
+
         stub = FileStub(file=self.csv_data, name=str(self.infile.filename))
         self.csv_data = FileUpload(stub)
 
@@ -141,14 +134,13 @@ class S8TigerParser(InstrumentResultsFileParser):
 
     def parse_row(self, ar, row_nr, row):
         # convert row to use interim field names
-        if 'reading' not in field_interim_map.values():
+        parsed = {field_interim_map.get(k, ''): v for k, v in row.items()}
+        if not parsed.get('reading', None):
             self.err("Missing 'reading' interim field.")
             return -1
-        parsed = {field_interim_map.get(k, ''): v for k, v in row.items()}
 
         formula = parsed.get('formula')
         kw = subn(r'[^\w\d\-_]*', '', formula)[0]
-        kw = kw.lower()
         try:
             analysis = self.get_analysis(ar, kw)
             if not analysis:
@@ -161,7 +153,7 @@ class S8TigerParser(InstrumentResultsFileParser):
             return
 
         # Concentration can be PPM or PCT as it likes, I'll save both.
-        concentration = parsed['concentration']
+        concentration = parsed['reading']
         try:
             val = float(subn(r'[^.\d]', '', str(concentration))[0])
         except (TypeError, ValueError, IndexError):
@@ -171,7 +163,7 @@ class S8TigerParser(InstrumentResultsFileParser):
             parsed['reading_ppm'] = ''
             return 0
         else:
-            if 'reading_ppm' in concentration.lower():
+            if 'ppm' in concentration.lower():
                 parsed['reading_pct'] = val * 0.0001
                 parsed['reading_ppm'] = val
             elif '%' in concentration:
@@ -182,7 +174,7 @@ class S8TigerParser(InstrumentResultsFileParser):
                           numline=row_nr, line=str(row))
                 return 0
 
-        if self.unit == 'ppm':
+        if self.default_unit == 'ppm':
             reading = parsed['reading_ppm']
         else:
             reading = parsed['reading_pct']
@@ -247,37 +239,36 @@ class importer(object):
         parser = S8TigerParser(infile,
                                worksheet=worksheet,
                                default_unit=default_unit)
-        if parser:
 
+        status = ['sample_received', 'attachment_due', 'to_be_verified']
+        if artoapply == 'received':
+            status = ['sample_received']
+        elif artoapply == 'received_tobeverified':
             status = ['sample_received', 'attachment_due', 'to_be_verified']
-            if artoapply == 'received':
-                status = ['sample_received']
-            elif artoapply == 'received_tobeverified':
-                status = ['sample_received', 'attachment_due', 'to_be_verified']
 
+        over = [False, False]
+        if override == 'nooverride':
             over = [False, False]
-            if override == 'nooverride':
-                over = [False, False]
-            elif override == 'override':
-                over = [True, False]
-            elif override == 'overrideempty':
-                over = [True, True]
+        elif override == 'override':
+            over = [True, False]
+        elif override == 'overrideempty':
+            over = [True, True]
 
-            importer = AnalysisResultsImporter(
-                parser=parser,
-                context=context,
-                allowed_ar_states=status,
-                allowed_analysis_states=None,
-                override=over,
-                instrument_uid=instrument)
+        importer = AnalysisResultsImporter(
+            parser=parser,
+            context=context,
+            allowed_ar_states=status,
+            allowed_analysis_states=None,
+            override=over,
+            instrument_uid=instrument)
 
-            try:
-                importer.process()
-                errors = importer.errors
-                logs = importer.logs
-                warns = importer.warns
-            except Exception as e:
-                errors.extend([repr(e), traceback.format_exc()])
+        try:
+            importer.process()
+            errors = importer.errors
+            logs = importer.logs
+            warns = importer.warns
+        except Exception as e:
+            errors.extend([repr(e), traceback.format_exc()])
 
         results = {'errors': errors, 'log': logs, 'warns': warns}
 

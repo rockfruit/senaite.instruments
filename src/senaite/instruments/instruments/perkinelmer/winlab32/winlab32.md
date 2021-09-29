@@ -26,7 +26,7 @@ If a cell value contains multiple lines of text, only the first line will be imp
 `Analyte name` does not need to contain an exact match to the AnalysisService keyword.
 
         - If `Analyte Name` column contains a value "Ag 107 (cps)" the AR must contain 
-          one Analysis who's keyword starts with "Ag107cps".
+          one Analysis who's keyword starts with "Ag107cps", or the row is skipped with a warning.
 
-        - If exactly one such analyses is not found, the record is skipped with a warning.
-
+        - If multiple analyses have keywords that match a single row, that row
+          is skipped with a warning.

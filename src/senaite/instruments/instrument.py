@@ -1,21 +1,22 @@
 import types
+from cStringIO import StringIO
 
-import openpyxl
-from openpyxl import load_workbook
 from senaite.core.exportimport.instruments.resultsimport import \
     InstrumentResultsFileParser
-from cStringIO import StringIO
+
+from openpyxl import load_workbook
 from xlrd import open_workbook
 from zope.publisher.browser import FileUpload
 
 
-def xls_to_csv(infile, worksheet=0, delimiter=","):
-    # TODO: Move to utility module
+class SheetNotFound(Exception):
     """
-    Convert xlsx to easier format first, since we want to use the
-    convenience of the CSV library
+    Sheet not found in workbook
+    """
 
-    """
+
+def xls_to_csv(infile, worksheet=0, delimiter=","):
+    worksheet = worksheet if worksheet else 0
 
     def find_sheet(wb, worksheet):
         for sheet in wb.sheets():
@@ -41,10 +42,6 @@ def xls_to_csv(infile, worksheet=0, delimiter=","):
     buffer.seek(0)
     return buffer
 
-class SheetNotFound(Exception):
-    """
-    Sheet not found in workbook
-    """
 
 def xlsx_to_csv(infile, worksheet=None, delimiter=","):
     worksheet = worksheet if worksheet else 0

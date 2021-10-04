@@ -64,19 +64,21 @@ class TestWinlab32(BaseTestCase):
             title='Dilution', Formula='[reading] * [factor]',
             InterimFields=calculation_interims)
 
+        self.cat = self.add_analysiscategory(title='Metals')
+
         self.services = [
             self.add_analysisservice(
                 title='Ag 107',
                 Keyword='Ag107',
                 PointOfCapture='lab',
-                Category=self.add_analysiscategory(title='Metals'),
+                Category=self.cat,
                 Calculation='Dilution',
                 InterimFields=service_interims),
             self.add_analysisservice(
                 title='Al 27',
                 Keyword='Al27',
                 PointOfCapture='lab',
-                Category=self.add_analysiscategory(title='Metals'),
+                Category=self.cat,
                 Calculation='Dilution',
                 InterimFields=service_interims),
         ]
@@ -114,14 +116,14 @@ class TestWinlab32(BaseTestCase):
                 title='asdf 1',
                 Keyword='asdf1',
                 PointOfCapture='lab',
-                Category=self.add_analysiscategory(title='Metals'),
+                Category=self.cat,
                 Calculation='Dilution' ,
                 InterimFields=service_interims),
             self.add_analysisservice(
                 title='asdf 2',
                 Keyword='asdf2',
                 PointOfCapture='lab',
-                Category=self.add_analysiscategory(title='Metals'),
+                Category=self.cat,
                 Calculation='Dilution',
                 InterimFields=service_interims)
         ]

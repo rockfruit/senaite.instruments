@@ -131,15 +131,14 @@ class Winlab32(InstrumentResultsFileParser):
         all_analyses = ar.getAnalyses()
         kw_analyses = [a for a in all_analyses if a.getKeyword.startswith(kw)]
         if not kw_analyses:
-            self.warn("No analysis found matching Keyword '${kw}'",
+            self.warn("No analysis found matching Keyword '${kw}'.",
                       mapping=dict(kw=kw))
-            return 0
-        if len(kw_analyses) > 1:
+        elif len(kw_analyses) > 1:
             self.warn('Multiple analyses found matching Keyword "${kw}"',
                       mapping=dict(kw=kw))
-            return 0
-
-        self._addRawResult(sample_id, {kw: parsed})
+        else:
+            analysis_keyword = kw_analyses[0].getKeyword
+            self._addRawResult(sample_id, {analysis_keyword: parsed})
         return 0
 
     @staticmethod

@@ -55,11 +55,11 @@ non_analyte_row_headers = [
 class Nexion350xParser(InstrumentResultsFileParser):
     ar = None
 
-    def __init__(self, infile, worksheet=0, encoding=None, delimiter=None):
+    def __init__(self, infile, worksheet=None, encoding=None, delimiter=None):
         self.delimiter = delimiter if delimiter else ','
         self.encoding = encoding
         self.infile = infile
-        self.worksheet = worksheet
+        self.worksheet = "Concentrations" if worksheet is None else worksheet
         self.csv_data = None
         self.sample_id = None
         mimetype = guess_type(self.infile.filename)
@@ -189,7 +189,7 @@ class importer(object):
         artoapply = request.form['artoapply']
         override = request.form['results_override']
         instrument = request.form.get('instrument', None)
-        worksheet = request.form.get('worksheet', 0)
+        worksheet = request.form.get('worksheet', 'Concentrations')
 
         parser = Nexion350xParser(infile, worksheet=worksheet)
 

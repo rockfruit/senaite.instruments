@@ -29,7 +29,7 @@
                name="worksheet"
                value="Concentrations"/>
         <small class="form-text text-muted">
-            You can also enter a sheet index, starting from 0.
+            Optional: You can use a sheet index (counting from 0), or a sheet name.
         </small>
     </div>
 

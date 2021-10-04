@@ -263,6 +263,32 @@ class TestBrukerS8Tiger(BaseTestCase):
         self.assertEqual(ag.getResult(), '1118000.0')
         self.assertEqual(al.getResult(), '2228000.0')
 
+    def test_default_to_pct(self):
+        ar = self.add_analysisrequest(
+            self.client,
+            dict(Client=self.client.UID(),
+                 Contact=self.contact.UID(),
+                 DateSampled=datetime.now().date().isoformat(),
+                 SampleType=self.sampletype.UID()),
+            [srv.UID() for srv in self.services])
+        api.do_transition_for(ar, 'receive')
+        fn = join(path, 'excel_saved_doc/DU-0001-234987347.xlsx')
+        data = open(fn, 'rb').read()
+        import_file = FileUpload(TestFile(cStringIO.StringIO(data), fn))
+        request = TestRequest(form=dict(
+            submitted=True,
+            artoapply='received_tobeverified',
+            results_override='override',
+            instrument_results_file=import_file,
+            default_unit='pct',
+            instrument=''))
+        results = importer.Import(self.portal, request)
+        ag = ar.getAnalyses(full_objects=True, getKeyword='Ag107')[0]
+        al = ar.getAnalyses(full_objects=True, getKeyword='Al27')[0]
+        test_results = eval(results)  # noqa
+        self.assertEqual(ag.getResult(), '11.8')
+        self.assertEqual(al.getResult(), '11.9')
+
     def test_multiple_analyses_found_with_keyword(self):
         services = [
             self.add_analysisservice(

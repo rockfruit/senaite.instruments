@@ -27,9 +27,9 @@
                class="form-control"
                id="worksheet"
                name="worksheet"
-               value="Concentrations"/>
+               value="0"/>
         <small class="form-text text-muted">
-            You can also enter a sheet index, starting from 0.
+            Optional: You can use a sheet index (counting from 0), or a sheet name.
         </small>
     </div>
 
@@ -40,10 +40,10 @@
             <option value="ppm">PPM</option>
         </select>
         <small class="form-text text-muted">
-            There should exist three interim fields on the analysis service:
-            <i>reading</i>, <i>reading_pct</i>, and <i>reading_ppm</i>.
-            <i>reading</i> contains the default analysis result, for which the unit
-            is decided by the value of this field.
+            The "reading" interim-field must exist on all target analysis service (or calculation).
+            It will contain the default analysis result, using the default unit above.
+            Interim fields named "reading_pct" and "reading_ppm", if they exist,
+            will have the corresponding values inserted.
         </small>
     </div>
 

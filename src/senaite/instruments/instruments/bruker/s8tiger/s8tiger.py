@@ -170,9 +170,9 @@ class S8TigerParser(InstrumentResultsFileParser):
                 parsed['reading_pct'] = val
                 parsed['reading_ppm'] = 1 / 0.0001 * val
             else:
-                self.warn("Can't decide if reading units are PPM or %",
-                          numline=row_nr, line=str(row))
-                return 0
+                val *= 100
+                parsed['reading_pct'] = val
+                parsed['reading_ppm'] = 1 / 0.0001 * val
 
         if self.default_unit == 'ppm':
             reading = parsed['reading_ppm']

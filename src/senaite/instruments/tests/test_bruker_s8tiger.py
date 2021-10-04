@@ -65,6 +65,8 @@ service_interims = [
 
 calculation_interims = [
     dict(keyword='reading', title='Reading', hidden=False),
+    dict(keyword='reading_pct', title='Reading', unit='%', hidden=False),
+    dict(keyword='reading_ppm', title='Reading', unit='ppm', hidden=False),
     dict(keyword='factor', title='Factor', hidden=False)
 ]
 
@@ -89,22 +91,22 @@ class TestBrukerS8Tiger(BaseTestCase):
             ImportDataInterface=IFACE,
         )
 
-        self.calculation = self.add_calculation(
+        self.dilution = self.add_calculation(
             title='Dilution', Formula='[reading] * [factor]',
             InterimFields=calculation_interims)
+
+        self.cat = self.add_analysiscategory(title='Metals')
 
         self.services = [
             self.add_analysisservice(title='Ag 107',
                                      Keyword='Ag107',
                                      PointOfCapture='lab',
-                                     Category='Metals',
-                                     Calculation='Dilution',
+                                     Category=self.cat,
                                      InterimFields=service_interims),
             self.add_analysisservice(title='al 27',
                                      Keyword='Al27',
                                      PointOfCapture='lab',
-                                     Category='Metals',
-                                     Calculation='Dilution',
+                                     Category=self.cat,
                                      InterimFields=service_interims)
         ]
         self.sampletype = self.add_sampletype(
@@ -267,15 +269,13 @@ class TestBrukerS8Tiger(BaseTestCase):
                 title='asdf 1',
                 Keyword='asdf1',
                 PointOfCapture='lab',
-                Category=self.add_analysiscategory(title='Metals'),
-                Calculation='Dilution' ,
+                Category=self.cat,
                 InterimFields=service_interims),
             self.add_analysisservice(
                 title='asdf 2',
                 Keyword='asdf2',
                 PointOfCapture='lab',
-                Category=self.add_analysiscategory(title='Metals'),
-                Calculation='Dilution',
+                Category=self.cat,
                 InterimFields=service_interims)
         ]
 
@@ -300,6 +300,40 @@ class TestBrukerS8Tiger(BaseTestCase):
         results = importer.Import(self.portal, request)
         results = eval(results)  # noqa
         self.assertTrue('Multiple analyses found' in results['warns'][0])
+
+    def test_interim_on_calculation(self):
+        services = [
+            self.add_analysisservice(
+                title='asdf 1',
+                Keyword='asdf1',
+                PointOfCapture='lab',
+                Category=self.cat,
+                Calculation=self.dilution,
+                InterimFields=service_interims)]
+        ar = self.add_analysisrequest(
+            self.client,
+            dict(Client=self.client.UID(),
+                 Contact=self.contact.UID(),
+                 DateSampled=datetime.now().date().isoformat(),
+                 SampleType=self.sampletype.UID()),
+            [srv.UID() for srv in services])
+        api.do_transition_for(ar, 'receive')
+        data = open(fn2, 'rb').read()
+        import_file = FileUpload(TestFile(cStringIO.StringIO(data), fn2))
+        request = TestRequest(form=dict(
+            submitted=True,
+            artoapply='received_tobeverified',
+            results_override='override',
+            instrument_results_file=import_file,
+            default_unit='pct',
+            instrument=''))
+
+        results = importer.Import(self.portal, request)
+        ag = ar.getAnalyses(full_objects=True, getKeyword='Ag107')[0]
+        al = ar.getAnalyses(full_objects=True, getKeyword='Al27')[0]
+        test_results = eval(results)  # noqa
+        self.assertEqual(ag.getResult(), '111.8')
+        self.assertEqual(al.getResult(), '222.8')
 
 
 def test_suite():

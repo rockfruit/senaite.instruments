@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<layers name="" meta_type="ComponentRegistry">
+    <layer name="senaite.instruments"
+           interface="senaite.instruments.interfaces.IInstruments"/>
+</layers>

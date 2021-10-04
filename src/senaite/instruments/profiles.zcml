@@ -1,0 +1,38 @@
+<configure
+        xmlns:browser="http://namespaces.zope.org/browser"
+        xmlns:cmf="http://namespaces.zope.org/cmf"
+        xmlns:five="http://namespaces.zope.org/five"
+        xmlns:genericsetup="http://namespaces.zope.org/genericsetup"
+        xmlns:i18n="http://namespaces.zope.org/i18n"
+        xmlns="http://namespaces.zope.org/zope"
+        i18n_domain="senaite.instruments">
+
+    <!-- Install Profile -->
+    <genericsetup:registerProfile
+            name="default"
+            title="SENAITE INSTRUMENTS"
+            directory="profiles/default"
+            description="SENAITE INSTRUMENTS Add-on"
+            provides="Products.GenericSetup.interfaces.EXTENSION"/>
+    <genericsetup:importStep
+            name="senaite.instruments.setuphandlers.install"
+            title="SENAITE INSTRUMENTS: Run Setup Handler"
+            description="Run install handler"
+            handler="senaite.instruments.setuphandlers.install">
+    </genericsetup:importStep>
+
+    <!-- Uninstall Profile -->
+    <genericsetup:registerProfile
+            name="uninstall"
+            title="Uninstall SENAITE INSTRUMENTS"
+            directory="profiles/uninstall"
+            description="Uninstall SENAITE INSTRUMENTS Add-on"
+            provides="Products.GenericSetup.interfaces.EXTENSION"/>
+    <genericsetup:importStep
+            name="senaite.instruments.setuphandlers.uninstall"
+            title="Uninstall SENAITE INSTRUMENTS"
+            description="Uninstall SENAITE INSTRUMENTS Add-on"
+            handler="senaite.instruments.setuphandlers.uninstall">
+    </genericsetup:importStep>
+
+</configure>

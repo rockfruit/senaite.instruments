@@ -25,16 +25,16 @@ from os.path import abspath
 from os.path import splitext
 from re import subn
 
+from bika.lims import api
+from bika.lims import bikaMessageFactory as _
+from senaite.core.catalog import ANALYSIS_CATALOG
+from senaite.core.catalog import SAMPLE_CATALOG
 from senaite.core.exportimport.instruments import IInstrumentAutoImportInterface
 from senaite.core.exportimport.instruments import IInstrumentImportInterface
 from senaite.core.exportimport.instruments.resultsimport import \
     AnalysisResultsImporter
 from senaite.core.exportimport.instruments.resultsimport import \
     InstrumentResultsFileParser
-
-from bika.lims import api
-from bika.lims import bikaMessageFactory as _
-from bika.lims.catalog import CATALOG_ANALYSIS_REQUEST_LISTING
 from senaite.instruments.instrument import FileStub
 from senaite.instruments.instrument import SheetNotFound
 from senaite.instruments.instrument import xls_to_csv
@@ -116,36 +116,54 @@ class Winlab32(InstrumentResultsFileParser):
             value = row['Reported Conc (Calib)']
         parsed = {'reading': value, 'DefaultResult': 'reading'}
 
+        # sample ID
         sample_id = subn(r'[^\w\d\-_]*', '', row.get('Sample ID', ""))[0]
         if not sample_id:
             return 0
+
+        # maybe AR
         ar = self.get_ar(sample_id)
-        if not ar:
-            msg = 'Sample not found for {}'.format(sample_id)
-            self.warn(msg, numline=row_nr, line=str(row))
+        if ar:
+            kw = subn(r"[^\w\d]*", "", row.get('Analyte Name', ""))[0]
+            if not kw:
+                return 0
+            all_ans = ar.getAnalyses()
+            kw_analyses = [a for a in all_ans if a.getKeyword.startswith(kw)]
+            if not kw_analyses:
+                self.warn("No analysis found matching Keyword '${kw}'",
+                          mapping=dict(kw=kw))
+            elif len(kw_analyses) > 1:
+                self.warn('Multiple analyses found matching Keyword "${kw}"',
+                          mapping=dict(kw=kw))
+            else:
+                analysis_keyword = kw_analyses[0].getKeyword
+                self._addRawResult(sample_id, {analysis_keyword: parsed})
             return 0
 
-        kw = subn(r"[^\w\d]*", "", row.get('Analyte Name', ""))[0]
-        if not kw:
-            return 0
-        all_analyses = ar.getAnalyses()
-        kw_analyses = [a for a in all_analyses if a.getKeyword.startswith(kw)]
-        if not kw_analyses:
-            self.warn("No analysis found matching Keyword '${kw}'",
-                      mapping=dict(kw=kw))
-            return 0
-        if len(kw_analyses) > 1:
-            self.warn('Multiple analyses found matching Keyword "${kw}"',
-                      mapping=dict(kw=kw))
+        # maybe Reference Analysis
+        ref_an = self.get_ref_an(sample_id)
+        if ref_an:
+            # __import__('pdb').set_trace()
+            kw = ref_an.getKeyword()
+            parsed = {kw: value, 'DefaultResult': kw}
+            self._addRawResult(sample_id, parsed)
             return 0
 
-        self._addRawResult(sample_id, {kw: parsed})
+        self.warn('Sample not found for ${sid}', mapping={'sid': sample_id})
         return 0
 
-    @staticmethod
-    def get_ar(sample_id):
+    def get_ar(self, sample_id):
         query = dict(portal_type="AnalysisRequest", getId=sample_id)
-        brains = api.search(query, CATALOG_ANALYSIS_REQUEST_LISTING)
+        brains = api.search(query, SAMPLE_CATALOG)
+        try:
+            return api.get_object(brains[0])
+        except IndexError:
+            pass
+
+    def get_ref_an(self, an_id):
+        query = dict(portal_type='ReferenceAnalysis',
+                     getReferenceAnalysesGroupID=an_id)
+        brains = api.search(query, ANALYSIS_CATALOG)
         try:
             return api.get_object(brains[0])
         except IndexError:

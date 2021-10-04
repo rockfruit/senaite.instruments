@@ -64,17 +64,20 @@ class TestNexion350X(BaseTestCase):
             title='Dilution', Formula='[reading] * [factor]',
             InterimFields=calculation_interims)
 
+        self.cat = self.add_analysiscategory(title='Metals')
+
+
         self.services = [
             self.add_analysisservice(title='Ag 107',
                                      Keyword='Ag107',
                                      PointOfCapture='lab',
-                                     Category='Metals',
+                                     Category=self.cat,
                                      Calculation='Dilution',
                                      InterimFields=service_interims),
             self.add_analysisservice(title='al 27',
                                      Keyword='Al27',
                                      PointOfCapture='lab',
-                                     Category='Metals',
+                                     Category=self.cat,
                                      Calculation='Dilution',
                                      InterimFields=service_interims)
         ]
@@ -120,89 +123,20 @@ class TestNexion350X(BaseTestCase):
         self.assertEqual(ag2.getResult(), '0.222')
         self.assertEqual(al2.getResult(), '0.666')
 
-    def test_import_xlsx_with_sheet_nr(self):
-        ar1 = self.add_analysisrequest(
-            self.client,
-            dict(Client=self.client.UID(),
-                 Contact=self.contact.UID(),
-                 DateSampled=datetime.now().date().isoformat(),
-                 SampleType=self.sampletype.UID()),
-            [srv.UID() for srv in self.services])
-        ar2 = self.add_analysisrequest(
-            self.client,
-            dict(Client=self.client.UID(),
-                 Contact=self.contact.UID(),
-                 DateSampled=datetime.now().date().isoformat(),
-                 SampleType=self.sampletype.UID()),
-            [srv.UID() for srv in self.services])
-        api.do_transition_for(ar1, 'receive')
-        api.do_transition_for(ar2, 'receive')
-
-        data = open(fn, 'rb').read()
-        import_file = FileUpload(TestFile(cStringIO.StringIO(data), fn))
-        request = TestRequest(form=dict(
-            submitted=True,
-            artoapply='received_tobeverified',
-            results_override='override',
-            instrument_results_file=import_file,
-            worksheet=4,
-            instrument=api.get_uid(self.instrument)))
-        results = importer.Import(self.portal, request)
-        test_results = eval(results)  # noqa
-        ag1 = ar1.getAnalyses(full_objects=True, getKeyword='Ag107')[0]
-        al1 = ar1.getAnalyses(full_objects=True, getKeyword='Al27')[0]
-        ag2 = ar2.getAnalyses(full_objects=True, getKeyword='Ag107')[0]
-        al2 = ar2.getAnalyses(full_objects=True, getKeyword='Al27')[0]
-        self.assertEqual(ag1.getResult(), '0.111')
-        self.assertEqual(al1.getResult(), '0.555')
-        self.assertEqual(ag2.getResult(), '0.222')
-        self.assertEqual(al2.getResult(), '0.666')
-
-    def test_import_xlsx_wrong_sheetname(self):
-        ar1 = self.add_analysisrequest(
-            self.client,
-            dict(Client=self.client.UID(),
-                 Contact=self.contact.UID(),
-                 DateSampled=datetime.now().date().isoformat(),
-                 SampleType=self.sampletype.UID()),
-            [srv.UID() for srv in self.services])
-        ar2 = self.add_analysisrequest(
-            self.client,
-            dict(Client=self.client.UID(),
-                 Contact=self.contact.UID(),
-                 DateSampled=datetime.now().date().isoformat(),
-                 SampleType=self.sampletype.UID()),
-            [srv.UID() for srv in self.services])
-        api.do_transition_for(ar1, 'receive')
-        api.do_transition_for(ar2, 'receive')
-
-        data = open(fn, 'rb').read()
-        import_file = FileUpload(TestFile(cStringIO.StringIO(data), fn))
-        request = TestRequest(form=dict(
-            submitted=True,
-            artoapply='received_tobeverified',
-            results_override='override',
-            instrument_results_file=import_file,
-            worksheet='WrongSheetName',
-            instrument=api.get_uid(self.instrument)))
-        results = importer.Import(self.portal, request)
-        results = eval(results)  # noqa
-        self.assertTrue('Sheet not found' in str(results['errors'][0]))
-
     def test_multiple_analyses_found_with_keyword(self):
         services = [
             self.add_analysisservice(
                 title='asdf 1',
                 Keyword='asdf1',
                 PointOfCapture='lab',
-                Category=self.add_analysiscategory(title='Metals'),
+                Category=self.cat,
                 Calculation='Dilution',
                 InterimFields=service_interims),
             self.add_analysisservice(
                 title='asdf 2',
                 Keyword='asdf2',
                 PointOfCapture='lab',
-                Category=self.add_analysiscategory(title='Metals'),
+                Category=self.cat,
                 Calculation='Dilution',
                 InterimFields=service_interims)
         ]

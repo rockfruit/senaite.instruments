@@ -7,7 +7,6 @@ from os.path import abspath
 
 from DateTime import DateTime
 from bika.lims import api
-from bika.lims.catalog import CATALOG_ANALYSIS_REQUEST_LISTING
 from senaite.core.exportimport.instruments import IInstrumentAutoImportInterface
 from senaite.core.exportimport.instruments import IInstrumentExportInterface
 from senaite.core.exportimport.instruments import IInstrumentImportInterface
@@ -21,7 +20,8 @@ from senaite.core.exportimport.instruments.resultsimport import \
 from plone.i18n.normalizer.interfaces import IIDNormalizer
 from zope.component import getUtility
 from zope.interface import implements
-
+from senaite.core.catalog import SETUP_CATALOG
+from senaite.core.catalog import SAMPLE_CATALOG
 
 class xcaliburexport(object):
     implements(IInstrumentExportInterface)
@@ -124,7 +124,7 @@ class xcaliburimport(object):
         # Load the most suitable parser according to file extension/options/etc...
         parser = None
         if not hasattr(infile, 'filename'):
-            errors.append(_("No file selected"))
+            errors.append("No file selected")
         parser = XCaliburCSVParser(infile)
         status = get_instrument_import_ar_allowed_states(artoapply)
         over = get_instrument_import_override(override)
@@ -153,7 +153,7 @@ class xcaliburimport(object):
 
 
 def is_keyword(kw):
-    bsc = api.get_tool('bika_setup_catalog')
+    bsc = api.get_tool(SETUP_CATALOG)
     return len(bsc(getKeyword=kw))
 
 
@@ -165,7 +165,7 @@ def find_analyses(ar_or_sample):
         resultsimport.py or somewhere central where it can be used by other
         instrument interfaces.
     """
-    bc = api.get_tool(CATALOG_ANALYSIS_REQUEST_LISTING)
+    bc = api.get_tool(SAMPLE_CATALOG)
     ar = bc(portal_type='AnalysisRequest', id=ar_or_sample)
     if len(ar) == 0:
         ar = bc(portal_type='AnalysisRequest', getClientSampleID=ar_or_sample)

@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 #
 # This file is part of SENAITE.INSTRUMENTS.
@@ -148,8 +147,7 @@ class S8TigerParser(InstrumentResultsFileParser):
             keyword = analysis.getKeyword
         except Exception as e:
             self.warn(msg="Error getting analysis for '${kw}': ${e}",
-                      mapping={'kw': kw, 'e': repr(e)},
-                      numline=row_nr, line=str(row))
+                      mapping={'kw': kw, 'e': repr(e)})
             return
 
         # Concentration can be PPM or PCT as it likes, I'll save both.
@@ -157,8 +155,8 @@ class S8TigerParser(InstrumentResultsFileParser):
         try:
             val = float(subn(r'[^.\d]', '', str(concentration))[0])
         except (TypeError, ValueError, IndexError):
-            self.warn(msg="Can't extract numerical value from `concentration`",
-                      numline=row_nr, line=str(row))
+            msg = "Can't extract numerical value from `concentration`: '${kw}'"
+            self.warn(msg, mapping={'kw': kw})
             parsed['reading_pct'] = ''
             parsed['reading_ppm'] = ''
             return 0
@@ -170,9 +168,11 @@ class S8TigerParser(InstrumentResultsFileParser):
                 parsed['reading_pct'] = val
                 parsed['reading_ppm'] = 1 / 0.0001 * val
             else:
-                self.warn("Can't decide if reading units are PPM or %",
-                          numline=row_nr, line=str(row))
-                return 0
+                # If value is not string, assume that it's a percentage
+                # represented as a decimal.
+                val *= 100
+                parsed['reading_pct'] = val
+                parsed['reading_ppm'] = 1 / 0.0001 * val
 
         if self.default_unit == 'ppm':
             reading = parsed['reading_ppm']

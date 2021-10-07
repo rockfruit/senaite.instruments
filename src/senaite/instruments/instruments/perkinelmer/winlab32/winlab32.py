@@ -121,8 +121,7 @@ class Winlab32(InstrumentResultsFileParser):
             return 0
         ar = self.get_ar(sample_id)
         if not ar:
-            msg = 'Sample not found for {}'.format(sample_id)
-            self.warn(msg, numline=row_nr, line=str(row))
+            self.warn('Sample not found for ${sid}', mapping={'sid':sample_id})
             return 0
 
         kw = subn(r"[^\w\d]*", "", row.get('Analyte Name', ""))[0]

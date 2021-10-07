@@ -116,35 +116,31 @@ class Nexion350xParser(InstrumentResultsFileParser):
         sample_id = subn(r'[^\w\d\-_]*', '', row.get('Sample Id', ''))[0]
         ar = self.get_ar(sample_id)
         if not ar:
-            msg = 'Sample not found for {}'.format(sample_id)
-            self.warn(msg, numline=row_nr, line=str(row))
+            self.warn('Sample not found for ${sid}', mapping={'sid':sample_id})
             return 0
         # Get sample analyses
         analyses = self.get_analyses(ar)
         # Search for rows who's headers are analyte keys
-        for Key in row.keys():
-            if Key in non_analyte_row_headers:
-                continue
-            src_kw = subn(r'[^\w\d]*', '', Key)[0]
-            if not src_kw:
+        for RawKey in row.keys():
+            src_kw = subn(r'[^\w\d]*', '', RawKey)[0]
+            if RawKey in non_analyte_row_headers or not src_kw:
                 continue
             try:
-                brains = [b for k, b in analyses.items() if
-                          k.startswith(src_kw)]
+                brains = [b for k, b in analyses.items()
+                          if k.startswith(src_kw)]
                 if not brains:
-                    self.log('No analysis found matching keyword ${kw}',
-                             mapping=dict(kw=src_kw),
-                             numline=row_nr, line=str(row))
+                    msg = 'No analysis found matching keyword "${kw}"'
+                    self.log(msg, mapping=dict(kw=src_kw))
                     continue
                 if len(brains) > 1:
-                    self.warn('Multiple analyses found matching Keyword "${kw}"',
-                             mapping=dict(kw=src_kw),
-                             numline=row_nr, line=str(row))
+                    msg = 'Multiple analyses found matching Keyword "${kw}"'
+                    self.warn(msg, mapping=dict(kw=src_kw))
                     continue
-                srv_kw = brains[0].getKeyword
 
-                parsed = dict(reading=float(row[Key]), DefaultResult='reading')
-                self._addRawResult(sample_id, {srv_kw: parsed})
+                analysis_key = brains[0].getKeyword
+                reading = float(row[RawKey])
+                parsed = dict(reading=reading, DefaultResult='reading')
+                self._addRawResult(sample_id, {analysis_key: parsed})
             except (TypeError, ValueError):
                 self.warn('Value for keyword ${kw} is not numeric',
                           mapping=dict(kw=src_kw),

@@ -120,6 +120,7 @@ class Winlab32(InstrumentResultsFileParser):
         if not sample_id:
             return 0
         ar = self.get_ar(sample_id)
+        __import__('pdb').set_trace()
         if not ar:
             self.warn('Sample not found for ${sid}', mapping={'sid':sample_id})
             return 0

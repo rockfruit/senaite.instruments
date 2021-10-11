@@ -131,7 +131,7 @@ class Winlab32(InstrumentResultsFileParser):
             all_ans = ar.getAnalyses()
             kw_analyses = [a for a in all_ans if a.getKeyword.startswith(kw)]
             if not kw_analyses:
-                self.warn("No analysis found matching Keyword '${kw}'.",
+                self.warn("No analysis found matching Keyword '${kw}'",
                           mapping=dict(kw=kw))
             elif len(kw_analyses) > 1:
                 self.warn('Multiple analyses found matching Keyword "${kw}"',
@@ -143,24 +143,26 @@ class Winlab32(InstrumentResultsFileParser):
 
         # maybe Reference Analysis
         ref_an = self.get_ref_an(sample_id)
+        __import__('pdb').set_trace()
         if ref_an:
             __import__('pdb').set_trace()
 
         self.warn('Sample not found for ${sid}', mapping={'sid': sample_id})
         return 0
 
-    def get_ref_an(self, an_id):
-        __import__('pdb').set_trace()
-        query = dict(portal_type="ReferenceAnalysis", getId=an_id)
-        brains = api.search(query, BIKA_CATALOG)
+    def get_ar(self, sample_id):
+        query = dict(portal_type="AnalysisRequest", getId=sample_id)
+        brains = api.search(query, CATALOG_ANALYSIS_REQUEST_LISTING)
         try:
             return api.get_object(brains[0])
         except IndexError:
             pass
 
-    def get_ar(self, sample_id):
-        query = dict(portal_type="AnalysisRequest", getId=sample_id)
-        brains = api.search(query, CATALOG_ANALYSIS_REQUEST_LISTING)
+    def get_ref_an(self, an_id):
+        __import__('pdb').set_trace()
+        query = dict(portal_type='ReferenceAnalysis',
+                     getReferenceAnalysesGroupID='QC21-001-001')
+        brains = api.search(query, 'bika_analysis_catalog')
         try:
             return api.get_object(brains[0])
         except IndexError:

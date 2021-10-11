@@ -143,9 +143,8 @@ class Winlab32(InstrumentResultsFileParser):
 
         # maybe Reference Analysis
         ref_an = self.get_ref_an(sample_id)
-        __import__('pdb').set_trace()
         if ref_an:
-            __import__('pdb').set_trace()
+            self._addRawResult(sample_id, parsed)
 
         self.warn('Sample not found for ${sid}', mapping={'sid': sample_id})
         return 0
@@ -159,7 +158,6 @@ class Winlab32(InstrumentResultsFileParser):
             pass
 
     def get_ref_an(self, an_id):
-        __import__('pdb').set_trace()
         query = dict(portal_type='ReferenceAnalysis',
                      getReferenceAnalysesGroupID='QC21-001-001')
         brains = api.search(query, 'bika_analysis_catalog')

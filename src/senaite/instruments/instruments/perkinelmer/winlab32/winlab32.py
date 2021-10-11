@@ -146,6 +146,7 @@ class Winlab32(InstrumentResultsFileParser):
         if ref_an:
             parsed = {'result': value, 'DefaultResult': 'result'}
             self._addRawResult(sample_id, parsed)
+            return 0
 
         self.warn('Sample not found for ${sid}', mapping={'sid': sample_id})
         return 0

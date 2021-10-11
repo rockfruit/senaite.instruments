@@ -144,8 +144,7 @@ class Winlab32(InstrumentResultsFileParser):
         # maybe Reference Analysis
         ref_an = self.get_ref_an(sample_id)
         if ref_an:
-            parsed = {'result': value, 'DefaultResult': 'result'}
-            __import__('pdb').set_trace()
+            parsed = {'Result': value, 'DefaultResult': 'Result'}
             self._addRawResult(sample_id, parsed)
             return 0
 

@@ -161,6 +161,7 @@ class Winlab32(InstrumentResultsFileParser):
             pass
 
     def get_ref_an(self, an_id):
+        __import__('pdb').set_trace()
         query = dict(portal_type='ReferenceAnalysis',
                      getReferenceAnalysesGroupID=an_id)
         brains = api.search(query, 'bika_analysis_catalog')
